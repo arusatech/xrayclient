@@ -7,11 +7,12 @@ authors = [
 ]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "jira (>=3.10.5,<4.0.0)",
     "jsonpath-nz (>=1.0.6,<2.0.0)",
-    "requests (>=2.31.0,<3.0.0)"
+    "requests (>=2.31.0,<3.0.0)",
+    "spacy (>=3.8.7,<4.0.0)"
 ]
 
 [tool.poetry]
@@ -44,7 +45,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12,<3.14"
 jira = "^3.10.5"
 jsonpath-nz = "^1.0.6"
 requests = "^2.31.0"

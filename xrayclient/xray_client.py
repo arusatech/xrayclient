@@ -2,12 +2,14 @@ import os
 import re
 import time
 import json
+import spacy
 import base64
 import requests
 import mimetypes
 from jira import JIRA
 from jsonpath_nz import log as logger, jprint
 from typing import Optional, Dict, Any, List, Union, Tuple
+
 
 class JiraHandler():
     """A handler class for interacting with JIRA's REST API.
@@ -975,12 +977,12 @@ class XrayGraphQL(JiraHandler):
             payload = {"query": query, "variables": variables}
             # logger.debug(f'Making GraphQL request "query": {query}, "variables": {variables} ')
             response = requests.post(graphql_url, headers=headers, json=payload)
-            jprint(response.json())
+            # jprint(response.json())
 
             response.raise_for_status()
             try:
                 data = response.json()
-                jprint(data)
+                # jprint(data)
             except:
                 data = response.text
                 logger.debug(f"Response text: {data}")
@@ -2450,7 +2452,7 @@ class XrayGraphQL(JiraHandler):
                 "testRunId": test_run_id
             }
             data = self._make_graphql_request(query, variables)
-            jprint(data)
+            # jprint(data)
             if not data:
                 logger.error(f"Failed to get test run comment for test run {test_run_id}")
                 return None
@@ -2645,5 +2647,199 @@ class XrayGraphQL(JiraHandler):
             logger.error(f"Error downloading JIRA attachment: {str(e)}")
             logger.traceback(e)
             return None
+
+    def generate_json_from_sentence(self, sentence, template_schema, debug=False):
+        """Extract information using template schema and spaCy components"""
+        def _ensure_spacy_model():
+            """Ensure spaCy model is available, download if needed"""
+            try:
+                nlp = spacy.load("en_core_web_md")
+                return nlp
+            except OSError:
+                import subprocess
+                import sys
+                logger.info("Downloading required spaCy model...")
+                try:
+                    subprocess.check_call([
+                        sys.executable, "-m", "spacy", "download", "en_core_web_md"
+                    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return spacy.load("en_core_web_md")
+                except subprocess.CalledProcessError:
+                    raise RuntimeError(
+                        "Failed to download spaCy model. Please run manually: "
+                        "python -m spacy download en_core_web_md"
+                    )
+
+        def analyze_model_components(nlp):
+            """Analyze the loaded model's components and capabilities"""
+            logger.info("=== Model Analysis ===")
+            logger.info(f"Model: {nlp.meta['name']}")
+            logger.info(f"Version: {nlp.meta['version']}")
+            logger.info(f"Pipeline: {nlp.pipe_names}")
+            logger.info(f"Components: {list(nlp.pipeline)}")
+            
+        def parse_template_pattern(pattern_value):
+            """Parse template pattern to extract structure and placeholders"""
+            if not isinstance(pattern_value, str):
+                return None
+            
+            # Extract placeholders like <string> from the pattern
+            placeholders = re.findall(r'<(\w+)>', pattern_value)
+            
+            # Create a regex pattern by replacing placeholders with capture groups
+            regex_pattern = pattern_value
+            for placeholder in placeholders:
+                # Replace <string> with a regex that captures word characters
+                regex_pattern = regex_pattern.replace(f'<{placeholder}>', r'(\w+)')
+            
+            return {
+                'original': pattern_value,
+                'placeholders': placeholders,
+                'regex_pattern': regex_pattern,
+                'regex': re.compile(regex_pattern, re.IGNORECASE)
+            }
+
+        def match_pattern_from_template(pattern_value, doc, debug=False):
+            """Match a pattern based on template value and return the matched text"""
+            
+            if isinstance(pattern_value, list):
+                # Handle list of exact values (for environment, region)
+                for value in pattern_value:
+                    for token in doc:
+                        if token.text.lower() == value.lower():
+                            if debug:
+                                logger.info(f"✓ Matched list value '{value}' -> {token.text}")
+                            return token.text
+                return None
+            
+            elif isinstance(pattern_value, str):
+                # Parse the template pattern dynamically
+                pattern_info = parse_template_pattern(pattern_value)
+                if not pattern_info:
+                    return None
+                
+                if debug:
+                    logger.info(f"Parsed pattern: {pattern_info['original']}")
+                    logger.info(f"Regex pattern: {pattern_info['regex_pattern']}")
+                
+                # Look for tokens that match the pattern
+                for token in doc:
+                    if pattern_info['regex'].match(token.text):
+                        if debug:
+                            logger.info(f"✓ Matched template pattern '{pattern_value}' -> {token.text}")
+                        return token.text
+                
+                return None
+
+        try:
+            if not sentence:
+                logger.error("Sentence is required")
+                return None
+            if not template_schema or not isinstance(template_schema, dict):
+                logger.error("Template schema is required")
+                return None
+            if not debug:
+                debug = False
+            
+            # Fix: Initialize result with all template schema keys
+            result = {key: None for key in template_schema.keys()}
+            result["sentences"] = []  # Initialize as empty list instead of string
+            
+        except Exception as e:
+            logger.error(f"Error generating JSON from sentence: {str(e)}")
+            logger.traceback(e)
+            return None
+        
+        # Only add debug fields if debug mode is enabled
+        if debug:
+            result.update({
+                "tokens_analysis": [],
+                "entities": [],
+                "dependencies": []
+            })
+        
+        try:
+            nlp = _ensure_spacy_model()
+            if not nlp:
+                logger.error("Failed to load spaCy model")
+                return None
+            if debug:
+                # Analyze model capabilities
+                analyze_model_components(nlp)
+            doc = nlp(sentence)
+
+            # Fix: Ensure sentences list exists before appending
+            if "sentences" not in result:
+                result["sentences"] = []
+                
+            for sent in doc.sents:
+                result["sentences"].append(sent.text.strip())
+            
+            # 2. Tokenize and analyze each token with spaCy components (only in debug mode)
+            if debug:
+                for token in doc:
+                    token_info = {
+                        "text": token.text,
+                        "lemma": token.lemma_,
+                        "pos": token.pos_,
+                        "tag": token.tag_,
+                        "dep": token.dep_,
+                        "head": token.head.text,
+                        "is_alpha": token.is_alpha,
+                        "is_digit": token.is_digit,
+                        "is_punct": token.is_punct,
+                        "shape": token.shape_,
+                        "is_stop": token.is_stop
+                    }
+                    result["tokens_analysis"].append(token_info)
+            
+            # 3. Dynamic pattern matching based on template schema values
+            for pattern_key, pattern_value in template_schema.items():
+                if not result[pattern_key]:  # Only search if not already found
+                    matched_value = match_pattern_from_template(pattern_value, doc, debug)
+                    if matched_value:
+                        result[pattern_key] = matched_value
+            
+            # 4. Use NER (Named Entity Recognition) component (only in debug mode)
+            if debug:
+                for ent in doc.ents:
+                    entity_info = {
+                        "text": ent.text,
+                        "label": ent.label_,
+                        "start": ent.start_char,
+                        "end": ent.end_char
+                    }
+                    result["entities"].append(entity_info)
+                    logger.info(f"✓ NER Entity: {ent.text} - {ent.label_}")
+            
+            # 5. Use dependency parsing to find relationships (only in debug mode)
+            if debug:
+                for token in doc:
+                    dep_info = {
+                        "token": token.text,
+                        "head": token.head.text,
+                        "dependency": token.dep_,
+                        "children": [child.text for child in token.children]
+                    }
+                    result["dependencies"].append(dep_info)
+            
+            # 6. Use lemmatizer to find action verbs and their objects
+            for token in doc:
+                if token.lemma_ in ["verify", "validate", "check", "test"]:
+                    if debug:
+                        logger.info(f"✓ Found action verb: {token.text} (lemma: {token.lemma_})")
+                    # Find what's being verified/validated
+                    for child in token.children:
+                        if child.dep_ in ["dobj", "pobj"]:
+                            if debug:
+                                logger.info(f"✓ Found verification target: {child.text}")
+            
+            return result
+        except Exception as e:
+            logger.error(f"Error extracting information from document: {str(e)}")
+            logger.traceback(e)
+            return None
+
+        
         
 
