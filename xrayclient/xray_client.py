@@ -2531,10 +2531,35 @@ class XrayGraphQL(JiraHandler):
             logger.traceback(e)
             return None
 
-    def download_attachment(self, jira_key: str, file_extension: str) -> Optional[Dict]:
-        '''
-        Download a JIRA attachment by its ID.
-        '''
+    def download_attachment_by_extension(self, jira_key: str, file_extension: str) -> Optional[Dict]:
+        """
+        Download JIRA attachments by file extension.
+        
+        Retrieves all attachments from a JIRA issue that match the specified file extension
+        and downloads their content. This method searches through all attachments on the
+        issue and filters by filename ending with the provided extension.
+        
+        Args:
+            jira_key (str): The JIRA issue key (e.g., 'PROJ-123')
+            file_extension (str): The file extension to search for (e.g., '.json', '.txt')
+                                 Should include the dot prefix
+                                 
+        Returns:
+            Optional[Dict]: A list of dictionaries containing attachment data, where each
+                           dictionary has filename as key and attachment content as value.
+                           Returns None if:
+                           - Issue cannot be retrieved
+                           - No attachments found with the specified extension
+                           - Error occurs during download
+                           
+        Example:
+            >>> client = XrayGraphQL()
+            >>> attachments = client.download_attachment_by_extension('PROJ-123', '.json')
+            >>> # Returns: [{'document.json': {'content': b'...', 'mime_type': 'application/json'}}]
+            
+        Raises:
+            Exception: Logged and handled internally, returns None on any error
+        """
         try:
             response = self.make_jira_request(jira_key, 'GET')
             
@@ -2550,10 +2575,70 @@ class XrayGraphQL(JiraHandler):
                 return None
             
             combined_attachment = []
+            fileDetails = dict()
             for attachment in target_attachment:
                 attachment_id = attachment.get('id')
                 mime_type = attachment.get('mimeType', '')
-                combined_attachment.append(self.download_jira_attachment_by_id(attachment_id, mime_type))
+                fileDetails[attachment.get('filename')] = self.download_jira_attachment_by_id(attachment_id, mime_type)
+                combined_attachment.append(fileDetails)
+            
+            return combined_attachment
+        except Exception as e:
+            logger.error(f"Error downloading JIRA attachment: {str(e)}")
+            logger.traceback(e)
+            return None
+        
+    def download_attachment_by_name(self, jira_key: str, file_name: str) -> Optional[Dict]:
+        """
+        Download JIRA attachments by filename prefix.
+        
+        Retrieves all attachments from a JIRA issue whose filenames start with the
+        specified name (case-insensitive). This method searches through all attachments
+        on the issue and filters by filename starting with the provided name.
+        
+        Args:
+            jira_key (str): The JIRA issue key (e.g., 'PROJ-123')
+            file_name (str): The filename prefix to search for (e.g., 'report', 'test')
+                            Case-insensitive matching is performed
+                            
+        Returns:
+            Optional[Dict]: A list of dictionaries containing attachment data, where each
+                           dictionary has filename as key and attachment content as value.
+                           Returns None if:
+                           - Issue cannot be retrieved
+                           - No attachments found with the specified filename prefix
+                           - Error occurs during download
+                           
+        Example:
+            >>> client = XrayGraphQL()
+            >>> attachments = client.download_attachment_by_name('PROJ-123', 'report')
+            >>> # Returns: [{'report_v1.json': {'content': b'...', 'mime_type': 'application/json'}},
+            >>> #          {'report_v2.json': {'content': b'...', 'mime_type': 'application/json'}}]
+            
+        Raises:
+            Exception: Logged and handled internally, returns None on any error
+        """
+        try:
+            response = self.make_jira_request(jira_key, 'GET')
+            
+            if not response or 'fields' not in response:
+                logger.error(f"Error: Could not retrieve issue {jira_key}")
+                return None
+            
+            # Find attachment by filename
+            attachments = response.get('fields', {}).get('attachment', [])
+            target_attachment = [att for att in attachments if att.get('filename').lower().startswith(file_name.lower())]
+            if not target_attachment:
+                logger.error(f"No attachment found for {jira_key} with extension {file_name}")
+                return None
+            
+            combined_attachment = []
+            fileDetails = dict()
+            for attachment in target_attachment:
+                attachment_id = attachment.get('id')
+                mime_type = attachment.get('mimeType', '')
+                fileDetails[attachment.get('filename')] = self.download_jira_attachment_by_id(attachment_id, mime_type)
+                combined_attachment.append(fileDetails)
             
             return combined_attachment
         except Exception as e:
