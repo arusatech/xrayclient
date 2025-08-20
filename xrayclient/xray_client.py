@@ -2,6 +2,7 @@ import os
 import re
 import time
 import json
+from numpy import isin
 import spacy
 import base64
 import requests
@@ -675,7 +676,7 @@ class XrayGraphQL(JiraHandler):
         Parse a string representation of a table into a dictionary of numeric values.
     Issue ID Management
     ------------------
-    get_issue_id_from_jira_id(issue_key: str, issue_type: str) -> Optional[str]
+    get_issue_id_from_jira_id(issue_key: str) -> Optional[str]
         Retrieves the internal Xray issue ID for a given JIRA issue key and type.
     Test Plan Operations
     -------------------
@@ -995,101 +996,45 @@ class XrayGraphQL(JiraHandler):
             logger.traceback(e)
             return None
     
-    def get_issue_id_from_jira_id(self, issue_key: str, issue_type: str) -> Optional[str]:
+    def get_issue_id_from_jira_id(self, issue_key: str) -> Optional[str]:
         """
-        Retrieves the internal Xray issue ID for a given JIRA issue key and type.
-        This method queries the Xray GraphQL API to find the internal issue ID corresponding
-        to a JIRA issue key. It supports different types of Xray artifacts including test plans,
-        test executions, test sets, and tests.
-        Args:
-            issue_key (str): The JIRA issue key (e.g., "PROJECT-123")
-            issue_type (str): The type of Xray artifact. Supported values are:
-                - "plan" or contains "plan": For Test Plans
-                - "exec" or contains "exec": For Test Executions
-                - "set" or contains "set": For Test Sets
-                - "test" or contains "test": For Tests
-                If not provided, defaults to "plan"
-        Returns:
-            Optional[str]: The internal Xray issue ID if found, None if:
-                - The issue key doesn't exist
-                - The GraphQL request fails
-                - Any other error occurs during processing
-        Examples:
-            >>> client.get_issue_id_from_jira_id("TEST-123", "plan")
-            '10000'
-            >>> client.get_issue_id_from_jira_id("TEST-456", "test")
-            '10001'
-            >>> client.get_issue_id_from_jira_id("INVALID-789", "plan")
-            None
-        Note:
-            The method performs a case-insensitive comparison when matching issue keys.
-            The project key is extracted from the issue_key (text before the hyphen)
-            to filter results by project.
+        Retrieves the internal JIRA issue ID for a given JIRA issue key.
+        
+        This method uses the JIRA API to fetch issue details and extract the internal
+        issue ID. The internal ID is a numeric identifier used by JIRA internally,
+        different from the human-readable issue key.
+        
+        Parameters
+        ----------
+        issue_key : str
+            The JIRA issue key to retrieve the internal ID for (e.g., "PROJ-123")
+            
+        Returns
+        -------
+        Optional[str]
+            The internal JIRA issue ID if found, None if:
+            - The issue key doesn't exist
+            - The JIRA API request fails
+            - Any other error occurs during processing
+            
+        Examples
+        --------
+        >>> client.get_issue_id_from_jira_id("TEST-123")
+        '10000'
+        >>> client.get_issue_id_from_jira_id("INVALID-789")
+        None
+        
+        Notes
+        -----
+        - The method uses the JIRA REST API via the get_issue() method
+        - The internal ID is different from the issue key (e.g., "TEST-123" vs "10000")
+        - Failed operations are logged as errors with relevant details
+        - The method handles missing issues gracefully by returning None
         """
         try:
-            parse_project = issue_key.split("-")[0]
-            function_name = "getTestPlans"
-            if not issue_type:
-                issue_type = "plan"
-            if "plan" in issue_type.lower():
-                function_name = "getTestPlans"
-                query = """
-                    query GetIds($limit: Int!, $jql: String!) {    
-                        getTestPlans(limit: $limit, jql:$jql) {
-                            results {
-                                issueId
-                                jira(fields: ["key"])
-                            }
-                        }
-                    }
-                    """
-            if "exec" in issue_type.lower():
-                function_name = "getTestExecutions"
-                query = """
-                    query GetIds($limit: Int!, $jql: String!) {    
-                        getTestExecutions(limit: $limit, jql:$jql) {
-                            results {
-                                issueId
-                                jira(fields: ["key"])
-                            }
-                        }
-                    }
-                    """
-            if "set" in issue_type.lower():
-                function_name = "getTestSets"
-                query = """
-                    query GetIds($limit: Int!, $jql: String!) {    
-                        getTestSets(limit: $limit, jql:$jql) {
-                            results {
-                                issueId
-                                jira(fields: ["key"])
-                            }
-                        }
-                    }
-                    """
-            if "test" in issue_type.lower():
-                function_name = "getTests"
-                query = """
-                    query GetIds($limit: Int!, $jql: String!) {    
-                        getTests(limit: $limit, jql:$jql) {
-                            results {
-                                issueId
-                                jira(fields: ["key"])
-                            }
-                        }
-                    }
-                    """
-            variables = {
-                "limit": 10,
-                "jql":  f"project = '{parse_project}' AND key = '{issue_key}'"
-            }
-            data = self._make_graphql_request(query, variables)
-            if not data:
-                logger.error(f"Failed to get issue ID for {issue_key}")
-                return None
-            for issue in data[function_name]['results']:
-                if str(issue['jira']['key']).lower() == issue_key.lower():
-                    return issue['issueId']
+            issue = self.get_issue(issue_key)
+            if isinstance(issue, dict):
+                return(issue.get('id', None))
             return None
         except Exception as e:
             logger.error(f"Failed to get issue ID for {issue_key}")
@@ -1116,11 +1061,11 @@ class XrayGraphQL(JiraHandler):
                 - The GraphQL request fails
                 - Any other error occurs during processing
         Examples:
-            >>> client.get_issue_id_from_jira_id("TEST-123", "plan")
+            >>> client.get_issue_id_from_jira_id("TEST-123")
             '10000'
-            >>> client.get_issue_id_from_jira_id("TEST-456", "test")
+            >>> client.get_issue_id_from_jira_id("TEST-456")
             '10001'
-            >>> client.get_issue_id_from_jira_id("INVALID-789", "plan")
+            >>> client.get_issue_id_from_jira_id("INVALID-789")
             None
         Note:
             The method performs a case-insensitive comparison when matching issue keys.
@@ -1263,14 +1208,14 @@ class XrayGraphQL(JiraHandler):
             - Test plan must exist in Xray and be accessible with current authentication
         """
         try:
-            test_plan_id = self.get_issue_id_from_jira_id(test_plan, "plan")
+            test_plan_id = self.get_issue_id_from_jira_id(test_plan)
             if not test_plan_id:
                 logger.error(f"Failed to get test plan ID for {test_plan}")
                 return None
             query = """
             query GetTestPlanTests($testPlanId: String!) {
                 getTestPlan(issueId: $testPlanId) {
-                    tests(limit: 99999) {
+                    tests(limit: 100) {
                         results {   
                             issueId
                             jira(fields: ["key"])
@@ -1322,14 +1267,14 @@ class XrayGraphQL(JiraHandler):
             - Test set must exist in Xray and be accessible with current authentication
         """
         try:
-            test_set_id = self.get_issue_id_from_jira_id(test_set, "set")
+            test_set_id = self.get_issue_id_from_jira_id(test_set)
             if not test_set_id:
                 logger.error(f"Failed to get test set ID for {test_set}")
                 return None
             query = """
             query GetTestSetTests($testSetId: String!) {
                 getTestSet(issueId: $testSetId) {
-                    tests(limit: 99999) {
+                    tests(limit: 100) {
                         results {   
                             issueId
                             jira(fields: ["key"])
@@ -1381,7 +1326,7 @@ class XrayGraphQL(JiraHandler):
             - Test execution must exist in Xray and be accessible with current authentication
         """
         try:
-            test_execution_id = self.get_issue_id_from_jira_id(test_execution, "exec")
+            test_execution_id = self.get_issue_id_from_jira_id(test_execution)
             if not test_execution_id:
                 logger.error(f"Failed to get test execution ID for {test_execution}")
                 return None
@@ -1445,7 +1390,7 @@ class XrayGraphQL(JiraHandler):
             - Failed operations are logged as errors with relevant details
         """
         try:
-            test_plan_id = self.get_issue_id_from_jira_id(test_plan, "plan")
+            test_plan_id = self.get_issue_id_from_jira_id(test_plan)
             if not test_plan_id:
                 logger.error(f"Failed to get test plan ID for {test_plan}")
                 return None
@@ -1499,7 +1444,7 @@ class XrayGraphQL(JiraHandler):
             - Test case must exist in Xray and be accessible with current authentication
         """
         try:
-            test_id = self.get_issue_id_from_jira_id(test_key, "test")
+            test_id = self.get_issue_id_from_jira_id(test_key)
             if not test_id:
                 logger.error(f"Failed to get test ID for  Test Case ({test_key})")
                 return None
@@ -1558,7 +1503,7 @@ class XrayGraphQL(JiraHandler):
             - Returns None if no valid tags are found or if an error occurs
         """
         try:
-            test_id = self.get_issue_id_from_jira_id(test_key, "test")
+            test_id = self.get_issue_id_from_jira_id(test_key)
             if not test_id:
                 logger.error(f"Failed to get test ID for  Test Case ({test_key})")
                 return None
@@ -1623,11 +1568,11 @@ class XrayGraphQL(JiraHandler):
             - Failed operations are logged as errors with relevant details
         """
         try:
-            test_case_id = self.get_issue_id_from_jira_id(test_case, "test")
+            test_case_id = self.get_issue_id_from_jira_id(test_case)
             if not test_case_id:
                 logger.error(f"Failed to get test ID for Test Case ({test_case})")
                 return None
-            test_exec_id = self.get_issue_id_from_jira_id(test_execution, "exec")
+            test_exec_id = self.get_issue_id_from_jira_id(test_execution)
             if not test_exec_id:
                 logger.error(f"Failed to get test execution ID for Test Execution ({test_execution})")
                 return None
@@ -1745,7 +1690,7 @@ class XrayGraphQL(JiraHandler):
             - Failed operations are logged with appropriate error or warning messages
         """
         try:
-            test_execution_id = self.get_issue_id_from_jira_id(test_execution, "exec")
+            test_execution_id = self.get_issue_id_from_jira_id(test_execution)
             if not test_execution_id:
                 logger.error(f"Failed to get test execution ID for {test_execution}")
                 return None
@@ -1837,11 +1782,11 @@ class XrayGraphQL(JiraHandler):
             - Failed operations are logged as errors with relevant details
         """
         try:
-            test_plan_id = self.get_issue_id_from_jira_id(test_plan, "plan")
+            test_plan_id = self.get_issue_id_from_jira_id(test_plan)
             if not test_plan_id:
                 logger.error(f"Test plan ID is required")
                 return None
-            test_exec_id = self.get_issue_id_from_jira_id(test_execution, "exec")
+            test_exec_id = self.get_issue_id_from_jira_id(test_execution)
             if not test_exec_id:
                 logger.error(f"Test execution ID is required")
                 return None
@@ -1911,7 +1856,7 @@ class XrayGraphQL(JiraHandler):
             invalid_keys = []
             test_issue_ids = []
             for key in test_issue_keys:
-                test_issue_id = self.get_issue_id_from_jira_id(key, "test")
+                test_issue_id = self.get_issue_id_from_jira_id(key)
                 if test_issue_id:
                     test_issue_ids.append(test_issue_id)
                 else:
