@@ -1,24 +1,25 @@
 [project]
 name = "xrayclient"
-version = "0.1.2"
+version = "0.1.8"
 description = "Python Client for Xray Test Management for Jira"
 authors = [
-    {name = "yakub@arusatech.com"}
+    {name = "AR USA LLC", email = "arusa@arusatech.com"}
 ]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "jira (>=3.10.5,<4.0.0)",
     "jsonpath-nz (>=1.0.6,<2.0.0)",
-    "requests (>=2.31.0,<3.0.0)"
+    "requests (>=2.31.0,<3.0.0)",
+    "spacy (>=3.8.7,<4.0.0)"
 ]
 
 [tool.poetry]
 name = "xrayclient"
-version = "0.1.2"
+version = "0.1.8"
 description = "Python Client for Xray Test Management for Jira"
-authors = ["yakub@arusatech.com"]
+authors = ["AR USA LLC <arusa@arusatech.com>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/arusatech/xrayclient"
@@ -44,10 +45,13 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12,<3.14"
 jira = "^3.10.5"
 jsonpath-nz = "^1.0.6"
 requests = "^2.31.0"
+pdoc = "^15.0.4"
+spacy = "^3.8.7"
+dotenv = "^0.9.9"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"

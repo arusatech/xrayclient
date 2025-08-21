@@ -2,12 +2,12 @@
 
 A comprehensive Python client for interacting with Xray Cloud's GraphQL API for test management in Jira. This library provides a robust interface for managing test plans, test executions, test runs, defects, evidence, and other Xray-related operations through GraphQL queries and mutations.
 
-## Documentation
+## 📚 Documentation
 
 - **HTML Documentation**: [View Online](https://github.com/arusatech/xrayclient/tree/main/docs/html)
 - **API Reference**: [API Docs](https://github.com/arusatech/xrayclient/tree/main/docs/html/xrayclient.html)
 
-## Features
+## ✨ Features
 
 - **Jira Integration**: Full Jira REST API support for issue management
 - **Xray GraphQL API**: Complete Xray Cloud GraphQL API integration
@@ -17,8 +17,11 @@ A comprehensive Python client for interacting with Xray Cloud's GraphQL API for 
 - **Authentication**: Secure authentication with both Jira and Xray Cloud
 - **Error Handling**: Comprehensive error handling and logging
 - **Type Hints**: Full type annotation support for better development experience
+- **Table Parsing**: Automatic parsing of tabular data from test plan descriptions
+- **File Operations**: Download attachments by extension or name
+- **Natural Language Processing**: Generate JSON from natural language sentences
 
-## Installation
+## 🚀 Installation
 
 ```bash
 pip install xrayclient
@@ -32,7 +35,7 @@ cd xrayclient
 pip install -e .
 ```
 
-## Quick Start
+## ⚡ Quick Start
 
 ### Basic Setup
 
@@ -59,7 +62,7 @@ XRAY_CLIENT_SECRET=your-xray-client-secret
 XRAY_BASE_URL=https://us.xray.cloud.getxray.app
 ```
 
-## Usage Examples
+## 📖 Usage Examples
 
 ### Test Plan Operations
 
@@ -72,6 +75,7 @@ print(test_plan_tests)
 # Get test plan data with parsed tables
 test_plan_data = client.get_test_plan_data("TEST-123")
 print(test_plan_data)
+# Output: {'column1': [1, 2, 3], 'column2': [4.5, 6.7, 8.9]}
 ```
 
 ### Test Execution Management
@@ -175,7 +179,21 @@ success = client.update_issue_summary("PROJ-123", "Updated summary")
 print(success)  # True
 ```
 
-## API Reference
+### Advanced Features
+
+```python
+# Download attachments by extension
+attachments = client.download_attachment_by_extension("PROJ-123", ".png")
+
+# Download attachments by name
+attachments = client.download_attachment_by_name("PROJ-123", "screenshot")
+
+# Generate JSON from natural language
+json_data = client.generate_json_from_sentence("Create a test with priority high and assign to john")
+print(json_data)
+```
+
+## 🔧 API Reference
 
 ### JiraHandler Class
 
@@ -226,14 +244,22 @@ Extends JiraHandler to provide Xray Cloud GraphQL API functionality.
 - `add_evidence_to_test_run(test_run_id, evidence_path)` - Add evidence
 - `create_defect_from_test_run(test_run_id, project_key, parent_issue_key, defect_summary, defect_description)` - Create defect
 
-## Requirements
+#### File Operations
+- `download_attachment_by_extension(issue_key, extension)` - Download attachments by file extension
+- `download_attachment_by_name(issue_key, filename)` - Download attachments by filename
+
+#### Natural Language Processing
+- `generate_json_from_sentence(sentence)` - Generate JSON from natural language
+
+## 📋 Requirements
 
 - Python >= 3.12
 - jira >= 3.10.5, < 4.0.0
 - jsonpath-nz >= 1.0.6, < 2.0.0
 - requests >= 2.31.0, < 3.0.0
+- spacy >= 3.8.7, < 4.0.0
 
-## Development
+## 🛠️ Development
 
 ### Setup Development Environment
 
@@ -266,7 +292,7 @@ The project uses:
 - **pytest-mock** for mocking in tests
 - **Type hints** for better code documentation
 
-## Error Handling
+## 🔒 Error Handling
 
 The library implements comprehensive error handling:
 
@@ -275,14 +301,14 @@ The library implements comprehensive error handling:
 - Automatic retry logic for transient failures
 - Graceful handling of authentication failures
 
-## Security
+## 🔐 Security
 
 - Uses environment variables for sensitive configuration
 - Supports API key authentication for both Jira and Xray
 - Implements proper token management and refresh
 - Handles secure file uploads for evidence
 
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -291,518 +317,29 @@ The library implements comprehensive error handling:
 5. Ensure all tests pass
 6. Submit a pull request
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## 🆘 Support
 
 For support and questions:
 - Create an issue on GitHub
 - Contact: yakub@arusatech.com
 
-## Changelog
+## 📝 Changelog
 
-### Version 0.1.0
+### Version 0.1.5
+- Added spacy dependency for natural language processing
+- Enhanced table parsing capabilities
+- Improved error handling and logging
+- Added file download operations
+- Enhanced documentation
+
+### Version 0.1.2
 - Initial release
 - Jira REST API integration
 - Xray Cloud GraphQL API integration
 - Complete test management functionality
 - Evidence and defect management
 - Comprehensive error handling and logging
-
-## Step 1: Install pdoc
-
-```bash
-# Install pdoc
-poetry add --group dev pdoc
-
-# Or with pip
-pip install pdoc
-```
-
-## Step 2: Update pyproject.toml to include pdoc
-
-```toml:pyproject.toml
-[project]
-name = "xrayclient"
-version = "0.1.0"
-description = "Python Client for Xray Test Management for Jira"
-authors = [
-    {name = "yakub@arusatech.com"}
-]
-license = {text = "MIT"}
-readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "jira (>=3.10.5,<4.0.0)",
-    "jsonpath-nz (>=1.0.6,<2.0.0)",
-    "requests (>=2.31.0,<3.0.0)"
-]
-
-[tool.poetry]
-name = "xrayclient"
-version = "0.1.0"
-description = "Python Client for Xray Test Management for Jira"
-authors = ["yakub@arusatech.com"]
-license = "MIT"
-readme = "README.md"
-homepage = "https://github.com/arusatech/xrayclient"
-repository = "https://github.com/arusatech/xrayclient"
-keywords = ["xray", "jira", "test-management", "graphql", "api-client"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Topic :: Software Development :: Testing",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-]
-packages = [{include = "xrayclient"}]
-
-[tool.poetry.dependencies]
-python = "^3.12"
-jira = "^3.10.5"
-jsonpath-nz = "^1.0.6"
-requests = "^2.31.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.4.1"
-pytest-cov = "^4.1.0"
-pytest-mock = "^3.11.1"
-pdoc = "^14.4.0"
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = [
-    "--verbose",
-    "--tb=short",
-    "--strict-markers",
-    "--disable-warnings",
-    "--cov=xrayclient",
-    "--cov-report=term-missing",
-    "--cov-report=html:htmlcov",
-    "--cov-report=xml:coverage.xml"
-]
-markers = [
-    "unit: Unit tests",
-    "integration: Integration tests",
-    "slow: Slow running tests"
-]
-
-[tool.pdoc]
-# pdoc configuration
-docformat = "google"
-template_directory = "docs/templates"
-output_directory = "docs/html"
-```
-
-## Step 3: Create Documentation Directory Structure
-
-```bash
-# Create documentation directories
-mkdir -p docs/html
-mkdir -p docs/templates
-```
-
-## Step 4: Create a Custom pdoc Template (Optional)
-
-Create `docs/templates/head.html` for custom styling:
-
-```html:docs/templates/head.html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}{{ module_name }}{% endblock %} - XrayClient Documentation</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2rem;
-            border-radius: 8px;
-            margin-bottom: 2rem;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 2.5rem;
-        }
-        .header p {
-            margin: 0.5rem 0 0 0;
-            opacity: 0.9;
-        }
-        .content {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        pre {
-            background: #f5f5f5;
-            padding: 1rem;
-            border-radius: 4px;
-            overflow-x: auto;
-        }
-        code {
-            background: #f0f0f0;
-            padding: 0.2rem 0.4rem;
-            border-radius: 3px;
-            font-family: 'Monaco', 'Menlo', monospace;
-        }
-        .method {
-            margin-bottom: 2rem;
-            padding: 1rem;
-            border-left: 4px solid #667eea;
-            background: #f8f9fa;
-        }
-        .method h3 {
-            margin-top: 0;
-            color: #667eea;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>XrayClient Documentation</h1>
-        <p>Python Client for Xray Test Management for Jira</p>
-    </div>
-    <div class="content">
-        {% block content %}{% endblock %}
-    </div>
-</body>
-</html>
-```
-
-## Step 5: Generate Documentation
-
-```bash
-# Generate HTML documentation
-poetry run pdoc --html --output-dir docs/html xrayclient
-
-# Or with more options
-poetry run pdoc --html --output-dir docs/html --template-dir docs/templates xrayclient
-```
-
-## Step 6: Create a Documentation Script
-
-Create `scripts/generate_docs.py`:
-
-```python:scripts/generate_docs.py
-#!/usr/bin/env python3
-"""
-Script to generate documentation using pdoc.
-"""
-
-import subprocess
-import sys
-import os
-from pathlib import Path
-
-def generate_docs():
-    """Generate HTML documentation using pdoc."""
-    
-    # Get project root
-    project_root = Path(__file__).parent.parent
-    
-    # Create docs directory if it doesn't exist
-    docs_dir = project_root / "docs" / "html"
-    docs_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Run pdoc
-    cmd = [
-        sys.executable, "-m", "pdoc",
-        "--html",
-        "--output-dir", str(docs_dir),
-        "--template-dir", str(project_root / "docs" / "templates"),
-        "xrayclient"
-    ]
-    
-    print("Generating documentation...")
-    result = subprocess.run(cmd, cwd=project_root)
-    
-    if result.returncode == 0:
-        print(f"Documentation generated successfully in {docs_dir}")
-        print(f"Open {docs_dir / 'xrayclient.html'} in your browser to view the docs")
-    else:
-        print("Failed to generate documentation")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    generate_docs()
-```
-
-## Step 7: Add Documentation to PyPI Package
-
-Update your `pyproject.toml` to include documentation files:
-
-```toml:pyproject.toml
-[project]
-name = "xrayclient"
-version = "0.1.0"
-description = "Python Client for Xray Test Management for Jira"
-authors = [
-    {name = "yakub@arusatech.com"}
-]
-license = {text = "MIT"}
-readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "jira (>=3.10.5,<4.0.0)",
-    "jsonpath-nz (>=1.0.6,<2.0.0)",
-    "requests (>=2.31.0,<3.0.0)"
-]
-
-[tool.poetry]
-name = "xrayclient"
-version = "0.1.0"
-description = "Python Client for Xray Test Management for Jira"
-authors = ["yakub@arusatech.com"]
-license = "MIT"
-readme = "README.md"
-homepage = "https://github.com/arusatech/xrayclient"
-repository = "https://github.com/arusatech/xrayclient"
-documentation = "https://arusatech.github.io/xrayclient/"
-keywords = ["xray", "jira", "test-management", "graphql", "api-client"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Topic :: Software Development :: Testing",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-]
-packages = [{include = "xrayclient"}]
-include = [
-    "docs/html/**/*",
-    "README.md",
-    "LICENSE"
-]
-
-[tool.poetry.dependencies]
-python = "^3.12"
-jira = "^3.10.5"
-jsonpath-nz = "^1.0.6"
-requests = "^2.31.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.4.1"
-pytest-cov = "^4.1.0"
-pytest-mock = "^3.11.1"
-pdoc = "^14.4.0"
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = [
-    "--verbose",
-    "--tb=short",
-    "--strict-markers",
-    "--disable-warnings",
-    "--cov=xrayclient",
-    "--cov-report=term-missing",
-    "--cov-report=html:htmlcov",
-    "--cov-report=xml:coverage.xml"
-]
-markers = [
-    "unit: Unit tests",
-    "integration: Integration tests",
-    "slow: Slow running tests"
-]
-
-[tool.pdoc]
-docformat = "google"
-template_directory = "docs/templates"
-output_directory = "docs/html"
-```
-
-## Step 8: Create a MANIFEST.in file
-
-Create `MANIFEST.in` to ensure documentation is included:
-
-```text:MANIFEST.in
-include README.md
-include LICENSE
-include CHANGELOG.md
-recursive-include docs/html *
-recursive-include docs/templates *
-```
-
-## Step 9: Update .gitignore
-
-```gitignore:.gitignore
-# Add these lines to your existing .gitignore
-dist/
-build/
-*.egg-info/
-.pytest_cache/
-htmlcov/
-coverage.xml
-
-# Don't ignore docs/html (we want to include it in the package)
-!docs/html/
-```
-
-## Step 10: Create a Documentation Generation Workflow
-
-Create `.github/workflows/docs.yml`:
-
-```yaml:.github/workflows/docs.yml
-name: Generate Documentation
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  docs:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-    
-    - name: Install Poetry
-      run: |
-        curl -sSL https://install.python-poetry.org | python3 -
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-    
-    - name: Install dependencies
-      run: poetry install
-    
-    - name: Generate documentation
-      run: poetry run python scripts/generate_docs.py
-    
-    - name: Upload documentation artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: documentation
-        path: docs/html/
-```
-
-## Step 11: Update README.md with Documentation Links
-
-```markdown:README.md
-<code_block_to_apply_changes_from>
-```
-
-## Step 12: Build and Publish with Documentation
-
-```bash
-# Generate documentation first
-poetry run python scripts/generate_docs.py
-
-# Build package (includes documentation)
-poetry build
-
-# Publish to PyPI
-poetry publish
-```
-
-## Step 13: Alternative: Host Documentation on GitHub Pages
-
-Create `.github/workflows/docs-pages.yml`:
-
-```yaml:.github/workflows/docs-pages.yml
-name: Deploy Documentation to GitHub Pages
-
-on:
-  push:
-    branches: [ main ]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-    
-    - name: Install Poetry
-      run: |
-        curl -sSL https://install.python-poetry.org | python3 -
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-    
-    - name: Install dependencies
-      run: poetry install
-    
-    - name: Generate documentation
-      run: poetry run python scripts/generate_docs.py
-    
-    - name: Setup Pages
-      uses: actions/configure-pages@v3
-    
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v2
-      with:
-        path: docs/html/
-    
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v2
-```
-
-## Step 14: Update pyproject.toml with GitHub Pages URL
-
-```toml:pyproject.toml
-[tool.poetry]
-# ... existing configuration ...
-documentation = "https://arusatech.github.io/xrayclient/"
-# ... rest of configuration ...
-```
-
-## Complete Documentation Workflow
-
-1. **Generate docs**: `poetry run python scripts/generate_docs.py`
-2. **Build package**: `poetry build` (includes docs)
-3. **Publish**: `poetry publish`
-4. **Deploy to GitHub Pages**: Automatic via GitHub Actions
-
-## Benefits of This Approach
-
-1. **Documentation included in PyPI package** - Users get docs with the package
-2. **Automated generation** - Docs are always up-to-date
-3. **GitHub Pages hosting** - Public documentation website
-4. **Custom styling** - Professional-looking documentation
-5. **Version control** - Docs are tracked with code
-
-This setup provides comprehensive documentation that's both included in your PyPI package and hosted online for easy access.

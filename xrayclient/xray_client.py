@@ -2,12 +2,15 @@ import os
 import re
 import time
 import json
+from numpy import isin
+import spacy
 import base64
 import requests
 import mimetypes
 from jira import JIRA
 from jsonpath_nz import log as logger, jprint
 from typing import Optional, Dict, Any, List, Union, Tuple
+
 
 class JiraHandler():
     """A handler class for interacting with JIRA's REST API.
@@ -673,7 +676,7 @@ class XrayGraphQL(JiraHandler):
         Parse a string representation of a table into a dictionary of numeric values.
     Issue ID Management
     ------------------
-    get_issue_id_from_jira_id(issue_key: str, issue_type: str) -> Optional[str]
+    get_issue_id_from_jira_id(issue_key: str) -> Optional[str]
         Retrieves the internal Xray issue ID for a given JIRA issue key and type.
     Test Plan Operations
     -------------------
@@ -975,12 +978,12 @@ class XrayGraphQL(JiraHandler):
             payload = {"query": query, "variables": variables}
             # logger.debug(f'Making GraphQL request "query": {query}, "variables": {variables} ')
             response = requests.post(graphql_url, headers=headers, json=payload)
-            jprint(response.json())
+            # jprint(response.json())
 
             response.raise_for_status()
             try:
                 data = response.json()
-                jprint(data)
+                # jprint(data)
             except:
                 data = response.text
                 logger.debug(f"Response text: {data}")
@@ -993,101 +996,45 @@ class XrayGraphQL(JiraHandler):
             logger.traceback(e)
             return None
     
-    def get_issue_id_from_jira_id(self, issue_key: str, issue_type: str) -> Optional[str]:
+    def get_issue_id_from_jira_id(self, issue_key: str) -> Optional[str]:
         """
-        Retrieves the internal Xray issue ID for a given JIRA issue key and type.
-        This method queries the Xray GraphQL API to find the internal issue ID corresponding
-        to a JIRA issue key. It supports different types of Xray artifacts including test plans,
-        test executions, test sets, and tests.
-        Args:
-            issue_key (str): The JIRA issue key (e.g., "PROJECT-123")
-            issue_type (str): The type of Xray artifact. Supported values are:
-                - "plan" or contains "plan": For Test Plans
-                - "exec" or contains "exec": For Test Executions
-                - "set" or contains "set": For Test Sets
-                - "test" or contains "test": For Tests
-                If not provided, defaults to "plan"
-        Returns:
-            Optional[str]: The internal Xray issue ID if found, None if:
-                - The issue key doesn't exist
-                - The GraphQL request fails
-                - Any other error occurs during processing
-        Examples:
-            >>> client.get_issue_id_from_jira_id("TEST-123", "plan")
-            '10000'
-            >>> client.get_issue_id_from_jira_id("TEST-456", "test")
-            '10001'
-            >>> client.get_issue_id_from_jira_id("INVALID-789", "plan")
-            None
-        Note:
-            The method performs a case-insensitive comparison when matching issue keys.
-            The project key is extracted from the issue_key (text before the hyphen)
-            to filter results by project.
+        Retrieves the internal JIRA issue ID for a given JIRA issue key.
+        
+        This method uses the JIRA API to fetch issue details and extract the internal
+        issue ID. The internal ID is a numeric identifier used by JIRA internally,
+        different from the human-readable issue key.
+        
+        Parameters
+        ----------
+        issue_key : str
+            The JIRA issue key to retrieve the internal ID for (e.g., "PROJ-123")
+            
+        Returns
+        -------
+        Optional[str]
+            The internal JIRA issue ID if found, None if:
+            - The issue key doesn't exist
+            - The JIRA API request fails
+            - Any other error occurs during processing
+            
+        Examples
+        --------
+        >>> client.get_issue_id_from_jira_id("TEST-123")
+        '10000'
+        >>> client.get_issue_id_from_jira_id("INVALID-789")
+        None
+        
+        Notes
+        -----
+        - The method uses the JIRA REST API via the get_issue() method
+        - The internal ID is different from the issue key (e.g., "TEST-123" vs "10000")
+        - Failed operations are logged as errors with relevant details
+        - The method handles missing issues gracefully by returning None
         """
         try:
-            parse_project = issue_key.split("-")[0]
-            function_name = "getTestPlans"
-            if not issue_type:
-                issue_type = "plan"
-            if "plan" in issue_type.lower():
-                function_name = "getTestPlans"
-                query = """
-                    query GetIds($limit: Int!, $jql: String!) {    
-                        getTestPlans(limit: $limit, jql:$jql) {
-                            results {
-                                issueId
-                                jira(fields: ["key"])
-                            }
-                        }
-                    }
-                    """
-            if "exec" in issue_type.lower():
-                function_name = "getTestExecutions"
-                query = """
-                    query GetIds($limit: Int!, $jql: String!) {    
-                        getTestExecutions(limit: $limit, jql:$jql) {
-                            results {
-                                issueId
-                                jira(fields: ["key"])
-                            }
-                        }
-                    }
-                    """
-            if "set" in issue_type.lower():
-                function_name = "getTestSets"
-                query = """
-                    query GetIds($limit: Int!, $jql: String!) {    
-                        getTestSets(limit: $limit, jql:$jql) {
-                            results {
-                                issueId
-                                jira(fields: ["key"])
-                            }
-                        }
-                    }
-                    """
-            if "test" in issue_type.lower():
-                function_name = "getTests"
-                query = """
-                    query GetIds($limit: Int!, $jql: String!) {    
-                        getTests(limit: $limit, jql:$jql) {
-                            results {
-                                issueId
-                                jira(fields: ["key"])
-                            }
-                        }
-                    }
-                    """
-            variables = {
-                "limit": 10,
-                "jql":  f"project = '{parse_project}' AND key = '{issue_key}'"
-            }
-            data = self._make_graphql_request(query, variables)
-            if not data:
-                logger.error(f"Failed to get issue ID for {issue_key}")
-                return None
-            for issue in data[function_name]['results']:
-                if str(issue['jira']['key']).lower() == issue_key.lower():
-                    return issue['issueId']
+            issue = self.get_issue(issue_key)
+            if isinstance(issue, dict):
+                return(issue.get('id', None))
             return None
         except Exception as e:
             logger.error(f"Failed to get issue ID for {issue_key}")
@@ -1114,11 +1061,11 @@ class XrayGraphQL(JiraHandler):
                 - The GraphQL request fails
                 - Any other error occurs during processing
         Examples:
-            >>> client.get_issue_id_from_jira_id("TEST-123", "plan")
+            >>> client.get_issue_id_from_jira_id("TEST-123")
             '10000'
-            >>> client.get_issue_id_from_jira_id("TEST-456", "test")
+            >>> client.get_issue_id_from_jira_id("TEST-456")
             '10001'
-            >>> client.get_issue_id_from_jira_id("INVALID-789", "plan")
+            >>> client.get_issue_id_from_jira_id("INVALID-789")
             None
         Note:
             The method performs a case-insensitive comparison when matching issue keys.
@@ -1201,6 +1148,7 @@ class XrayGraphQL(JiraHandler):
                                 steps {
                                     id
                                     action
+                                    data
                                     result
                                     attachments {
                                     id
@@ -1261,14 +1209,14 @@ class XrayGraphQL(JiraHandler):
             - Test plan must exist in Xray and be accessible with current authentication
         """
         try:
-            test_plan_id = self.get_issue_id_from_jira_id(test_plan, "plan")
+            test_plan_id = self.get_issue_id_from_jira_id(test_plan)
             if not test_plan_id:
                 logger.error(f"Failed to get test plan ID for {test_plan}")
                 return None
             query = """
             query GetTestPlanTests($testPlanId: String!) {
                 getTestPlan(issueId: $testPlanId) {
-                    tests(limit: 99999) {
+                    tests(limit: 100) {
                         results {   
                             issueId
                             jira(fields: ["key"])
@@ -1320,14 +1268,14 @@ class XrayGraphQL(JiraHandler):
             - Test set must exist in Xray and be accessible with current authentication
         """
         try:
-            test_set_id = self.get_issue_id_from_jira_id(test_set, "set")
+            test_set_id = self.get_issue_id_from_jira_id(test_set)
             if not test_set_id:
                 logger.error(f"Failed to get test set ID for {test_set}")
                 return None
             query = """
             query GetTestSetTests($testSetId: String!) {
                 getTestSet(issueId: $testSetId) {
-                    tests(limit: 99999) {
+                    tests(limit: 100) {
                         results {   
                             issueId
                             jira(fields: ["key"])
@@ -1379,7 +1327,7 @@ class XrayGraphQL(JiraHandler):
             - Test execution must exist in Xray and be accessible with current authentication
         """
         try:
-            test_execution_id = self.get_issue_id_from_jira_id(test_execution, "exec")
+            test_execution_id = self.get_issue_id_from_jira_id(test_execution)
             if not test_execution_id:
                 logger.error(f"Failed to get test execution ID for {test_execution}")
                 return None
@@ -1443,7 +1391,7 @@ class XrayGraphQL(JiraHandler):
             - Failed operations are logged as errors with relevant details
         """
         try:
-            test_plan_id = self.get_issue_id_from_jira_id(test_plan, "plan")
+            test_plan_id = self.get_issue_id_from_jira_id(test_plan)
             if not test_plan_id:
                 logger.error(f"Failed to get test plan ID for {test_plan}")
                 return None
@@ -1497,7 +1445,7 @@ class XrayGraphQL(JiraHandler):
             - Test case must exist in Xray and be accessible with current authentication
         """
         try:
-            test_id = self.get_issue_id_from_jira_id(test_key, "test")
+            test_id = self.get_issue_id_from_jira_id(test_key)
             if not test_id:
                 logger.error(f"Failed to get test ID for  Test Case ({test_key})")
                 return None
@@ -1556,7 +1504,7 @@ class XrayGraphQL(JiraHandler):
             - Returns None if no valid tags are found or if an error occurs
         """
         try:
-            test_id = self.get_issue_id_from_jira_id(test_key, "test")
+            test_id = self.get_issue_id_from_jira_id(test_key)
             if not test_id:
                 logger.error(f"Failed to get test ID for  Test Case ({test_key})")
                 return None
@@ -1621,11 +1569,11 @@ class XrayGraphQL(JiraHandler):
             - Failed operations are logged as errors with relevant details
         """
         try:
-            test_case_id = self.get_issue_id_from_jira_id(test_case, "test")
+            test_case_id = self.get_issue_id_from_jira_id(test_case)
             if not test_case_id:
                 logger.error(f"Failed to get test ID for Test Case ({test_case})")
                 return None
-            test_exec_id = self.get_issue_id_from_jira_id(test_execution, "exec")
+            test_exec_id = self.get_issue_id_from_jira_id(test_execution)
             if not test_exec_id:
                 logger.error(f"Failed to get test execution ID for Test Execution ({test_execution})")
                 return None
@@ -1743,7 +1691,7 @@ class XrayGraphQL(JiraHandler):
             - Failed operations are logged with appropriate error or warning messages
         """
         try:
-            test_execution_id = self.get_issue_id_from_jira_id(test_execution, "exec")
+            test_execution_id = self.get_issue_id_from_jira_id(test_execution)
             if not test_execution_id:
                 logger.error(f"Failed to get test execution ID for {test_execution}")
                 return None
@@ -1835,11 +1783,11 @@ class XrayGraphQL(JiraHandler):
             - Failed operations are logged as errors with relevant details
         """
         try:
-            test_plan_id = self.get_issue_id_from_jira_id(test_plan, "plan")
+            test_plan_id = self.get_issue_id_from_jira_id(test_plan)
             if not test_plan_id:
                 logger.error(f"Test plan ID is required")
                 return None
-            test_exec_id = self.get_issue_id_from_jira_id(test_execution, "exec")
+            test_exec_id = self.get_issue_id_from_jira_id(test_execution)
             if not test_exec_id:
                 logger.error(f"Test execution ID is required")
                 return None
@@ -1909,7 +1857,7 @@ class XrayGraphQL(JiraHandler):
             invalid_keys = []
             test_issue_ids = []
             for key in test_issue_keys:
-                test_issue_id = self.get_issue_id_from_jira_id(key, "test")
+                test_issue_id = self.get_issue_id_from_jira_id(key)
                 if test_issue_id:
                     test_issue_ids.append(test_issue_id)
                 else:
@@ -2450,7 +2398,7 @@ class XrayGraphQL(JiraHandler):
                 "testRunId": test_run_id
             }
             data = self._make_graphql_request(query, variables)
-            jprint(data)
+            # jprint(data)
             if not data:
                 logger.error(f"Failed to get test run comment for test run {test_run_id}")
                 return None
@@ -2645,5 +2593,263 @@ class XrayGraphQL(JiraHandler):
             logger.error(f"Error downloading JIRA attachment: {str(e)}")
             logger.traceback(e)
             return None
+
+    def download_xray_attachment_by_id(self, attachment_id: str, mime_type: str) -> Optional[Dict]:
+        '''
+        Download an Xray attachment by its ID using Xray API authentication.
+        
+        This method downloads attachments from Xray Cloud using the proper Xray API
+        endpoint and Bearer token authentication, unlike JIRA attachments which use
+        Basic authentication.
+        
+        Args:
+            attachment_id (str): The Xray attachment ID
+            mime_type (str): The MIME type of the attachment
+            
+        Returns:
+            Optional[Dict]: A dictionary containing the attachment content and metadata,
+                           or None if the download fails
+        '''
+        try:
+            # Use the Xray API endpoint for attachments
+            CONTENT_URL = f"{self.xray_base_url}/api/v2/attachments/{attachment_id}"
+            if not CONTENT_URL:
+                logger.error(f"No content URL found for attachment '{attachment_id}'")
+                return None
+            
+            # Use Xray Bearer token authentication
+            headers = {
+                "Authorization": f"Bearer {self.token}",
+                "Content-Type": "application/json"
+            }
+            
+            download_response = requests.get(CONTENT_URL, headers=headers)
+            download_response.raise_for_status()
+            content = download_response.content
+            
+            # Process content based on type
+            result = {
+                'content': content,
+                'mime_type': mime_type,
+                'text_content': None,
+                'json_content': None
+            }
+            
+            # Handle text-based files
+            if mime_type.startswith(('text/', 'application/json', 'application/xml', 'json')):
+                try:
+                    text_content = content.decode('utf-8')
+                    result['text_content'] = text_content
+                    
+                    # Try to parse as JSON
+                    if 'json' in mime_type:
+                        try:
+                            result['json_content'] = json.loads(text_content)
+                        except json.JSONDecodeError:
+                            pass
+                except UnicodeDecodeError:
+                    logger.error(f"Warning: Could not decode text content for {attachment_id}")
+                    logger.traceback(e)
+            
+            return result
+        except Exception as e:
+            logger.error(f"Error downloading Xray attachment: {str(e)}")
+            logger.traceback(e)
+            return None
+
+    
+    def generate_json_from_sentence(self, sentence, template_schema, debug=False):
+        """Extract information using template schema and spaCy components"""
+        def _ensure_spacy_model():
+            """Ensure spaCy model is available, download if needed"""
+            try:
+                nlp = spacy.load("en_core_web_md")
+                return nlp
+            except OSError:
+                import subprocess
+                import sys
+                logger.info("Downloading required spaCy model...")
+                try:
+                    subprocess.check_call([
+                        sys.executable, "-m", "spacy", "download", "en_core_web_md"
+                    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return spacy.load("en_core_web_md")
+                except subprocess.CalledProcessError:
+                    raise RuntimeError(
+                        "Failed to download spaCy model. Please run manually: "
+                        "python -m spacy download en_core_web_md"
+                    )
+
+        def analyze_model_components(nlp):
+            """Analyze the loaded model's components and capabilities"""
+            logger.info("=== Model Analysis ===")
+            logger.info(f"Model: {nlp.meta['name']}")
+            logger.info(f"Version: {nlp.meta['version']}")
+            logger.info(f"Pipeline: {nlp.pipe_names}")
+            logger.info(f"Components: {list(nlp.pipeline)}")
+            
+        def parse_template_pattern(pattern_value):
+            """Parse template pattern to extract structure and placeholders"""
+            if not isinstance(pattern_value, str):
+                return None
+            
+            # Extract placeholders like <string> from the pattern
+            placeholders = re.findall(r'<(\w+)>', pattern_value)
+            
+            # Create a regex pattern by replacing placeholders with capture groups
+            regex_pattern = pattern_value
+            for placeholder in placeholders:
+                # Replace <string> with a regex that captures word characters
+                regex_pattern = regex_pattern.replace(f'<{placeholder}>', r'(\w+)')
+            
+            return {
+                'original': pattern_value,
+                'placeholders': placeholders,
+                'regex_pattern': regex_pattern,
+                'regex': re.compile(regex_pattern, re.IGNORECASE)
+            }
+
+        def match_pattern_from_template(pattern_value, doc, debug=False):
+            """Match a pattern based on template value and return the matched text"""
+            
+            if isinstance(pattern_value, list):
+                # Handle list of exact values (for environment, region)
+                for value in pattern_value:
+                    for token in doc:
+                        if token.text.lower() == value.lower():
+                            if debug:
+                                logger.info(f"✓ Matched list value '{value}' -> {token.text}")
+                            return token.text
+                return None
+            
+            elif isinstance(pattern_value, str):
+                # Parse the template pattern dynamically
+                pattern_info = parse_template_pattern(pattern_value)
+                if not pattern_info:
+                    return None
+                
+                if debug:
+                    logger.info(f"Parsed pattern: {pattern_info['original']}")
+                    logger.info(f"Regex pattern: {pattern_info['regex_pattern']}")
+                
+                # Look for tokens that match the pattern
+                for token in doc:
+                    if pattern_info['regex'].match(token.text):
+                        if debug:
+                            logger.info(f"✓ Matched template pattern '{pattern_value}' -> {token.text}")
+                        return token.text
+                
+                return None
+
+        try:
+            if not sentence:
+                logger.error("Sentence is required")
+                return None
+            if not template_schema or not isinstance(template_schema, dict):
+                logger.error("Template schema is required")
+                return None
+            if not debug:
+                debug = False
+            
+            # Fix: Initialize result with all template schema keys
+            result = {key: None for key in template_schema.keys()}
+            result["sentences"] = []  # Initialize as empty list instead of string
+            
+        except Exception as e:
+            logger.error(f"Error generating JSON from sentence: {str(e)}")
+            logger.traceback(e)
+            return None
+        
+        # Only add debug fields if debug mode is enabled
+        if debug:
+            result.update({
+                "tokens_analysis": [],
+                "entities": [],
+                "dependencies": []
+            })
+        
+        try:
+            nlp = _ensure_spacy_model()
+            if not nlp:
+                logger.error("Failed to load spaCy model")
+                return None
+            if debug:
+                # Analyze model capabilities
+                analyze_model_components(nlp)
+            doc = nlp(sentence)
+
+            # Fix: Ensure sentences list exists before appending
+            if "sentences" not in result:
+                result["sentences"] = []
+                
+            for sent in doc.sents:
+                result["sentences"].append(sent.text.strip())
+            
+            # 2. Tokenize and analyze each token with spaCy components (only in debug mode)
+            if debug:
+                for token in doc:
+                    token_info = {
+                        "text": token.text,
+                        "lemma": token.lemma_,
+                        "pos": token.pos_,
+                        "tag": token.tag_,
+                        "dep": token.dep_,
+                        "head": token.head.text,
+                        "is_alpha": token.is_alpha,
+                        "is_digit": token.is_digit,
+                        "is_punct": token.is_punct,
+                        "shape": token.shape_,
+                        "is_stop": token.is_stop
+                    }
+                    result["tokens_analysis"].append(token_info)
+            
+            # 3. Dynamic pattern matching based on template schema values
+            for pattern_key, pattern_value in template_schema.items():
+                if not result[pattern_key]:  # Only search if not already found
+                    matched_value = match_pattern_from_template(pattern_value, doc, debug)
+                    if matched_value:
+                        result[pattern_key] = matched_value
+            
+            # 4. Use NER (Named Entity Recognition) component (only in debug mode)
+            if debug:
+                for ent in doc.ents:
+                    entity_info = {
+                        "text": ent.text,
+                        "label": ent.label_,
+                        "start": ent.start_char,
+                        "end": ent.end_char
+                    }
+                    result["entities"].append(entity_info)
+                    logger.info(f"✓ NER Entity: {ent.text} - {ent.label_}")
+            
+            # 5. Use dependency parsing to find relationships (only in debug mode)
+            if debug:
+                for token in doc:
+                    dep_info = {
+                        "token": token.text,
+                        "head": token.head.text,
+                        "dependency": token.dep_,
+                        "children": [child.text for child in token.children]
+                    }
+                    result["dependencies"].append(dep_info)
+            
+            # 6. Use lemmatizer to find action verbs and their objects
+            for token in doc:
+                if token.lemma_ in ["verify", "validate", "check", "test"]:
+                    if debug:
+                        logger.info(f"✓ Found action verb: {token.text} (lemma: {token.lemma_})")
+                    # Find what's being verified/validated
+                    for child in token.children:
+                        if child.dep_ in ["dobj", "pobj"]:
+                            if debug:
+                                logger.info(f"✓ Found verification target: {child.text}")
+            
+            return result
+        except Exception as e:
+            logger.error(f"Error extracting information from document: {str(e)}")
+            logger.traceback(e)
+            return None
+
+        
         
 
