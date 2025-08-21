@@ -1148,6 +1148,7 @@ class XrayGraphQL(JiraHandler):
                                 steps {
                                     id
                                     action
+                                    data
                                     result
                                     attachments {
                                     id
@@ -2593,6 +2594,70 @@ class XrayGraphQL(JiraHandler):
             logger.traceback(e)
             return None
 
+    def download_xray_attachment_by_id(self, attachment_id: str, mime_type: str) -> Optional[Dict]:
+        '''
+        Download an Xray attachment by its ID using Xray API authentication.
+        
+        This method downloads attachments from Xray Cloud using the proper Xray API
+        endpoint and Bearer token authentication, unlike JIRA attachments which use
+        Basic authentication.
+        
+        Args:
+            attachment_id (str): The Xray attachment ID
+            mime_type (str): The MIME type of the attachment
+            
+        Returns:
+            Optional[Dict]: A dictionary containing the attachment content and metadata,
+                           or None if the download fails
+        '''
+        try:
+            # Use the Xray API endpoint for attachments
+            CONTENT_URL = f"{self.xray_base_url}/api/v2/attachments/{attachment_id}"
+            if not CONTENT_URL:
+                logger.error(f"No content URL found for attachment '{attachment_id}'")
+                return None
+            
+            # Use Xray Bearer token authentication
+            headers = {
+                "Authorization": f"Bearer {self.token}",
+                "Content-Type": "application/json"
+            }
+            
+            download_response = requests.get(CONTENT_URL, headers=headers)
+            download_response.raise_for_status()
+            content = download_response.content
+            
+            # Process content based on type
+            result = {
+                'content': content,
+                'mime_type': mime_type,
+                'text_content': None,
+                'json_content': None
+            }
+            
+            # Handle text-based files
+            if mime_type.startswith(('text/', 'application/json', 'application/xml', 'json')):
+                try:
+                    text_content = content.decode('utf-8')
+                    result['text_content'] = text_content
+                    
+                    # Try to parse as JSON
+                    if 'json' in mime_type:
+                        try:
+                            result['json_content'] = json.loads(text_content)
+                        except json.JSONDecodeError:
+                            pass
+                except UnicodeDecodeError:
+                    logger.error(f"Warning: Could not decode text content for {attachment_id}")
+                    logger.traceback(e)
+            
+            return result
+        except Exception as e:
+            logger.error(f"Error downloading Xray attachment: {str(e)}")
+            logger.traceback(e)
+            return None
+
+    
     def generate_json_from_sentence(self, sentence, template_schema, debug=False):
         """Extract information using template schema and spaCy components"""
         def _ensure_spacy_model():

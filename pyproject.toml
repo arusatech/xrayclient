@@ -1,6 +1,6 @@
 [project]
 name = "xrayclient"
-version = "0.1.6"
+version = "0.1.7"
 description = "Python Client for Xray Test Management for Jira"
 authors = [
     {name = "Yakub Mohammad", email = "yakub@arusatech.com"}
@@ -17,7 +17,7 @@ dependencies = [
 
 [tool.poetry]
 name = "xrayclient"
-version = "0.1.6"
+version = "0.1.7"
 description = "Python Client for Xray Test Management for Jira"
 authors = ["Yakub Mohammad <yakub@arusatech.com>"]
 license = "MIT"
