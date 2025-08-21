@@ -7,6 +7,6 @@ for test management in Jira.
 
 from .xray_client import JiraHandler, XrayGraphQL
 
-__version__ = "0.1.7"
-__author__ = "yakub@arusatech.com"
+__version__ = "0.1.8"
+__author__ = "arusa@arusatech.com"
 __all__ = ["JiraHandler", "XrayGraphQL"] 
